@@ -1,5 +1,17 @@
 import rl from "./cli.js";
 import llm from "./llm.js";
+import { showBanner } from "./banner.js";
+import chalk from "chalk";
+
+showBanner();
+
+// it listens for the SIGINT signal, which is typically sent when the user presses Ctrl+C in the terminal. When this signal is received, the provided callback function is executed.
+// In this case, it logs a farewell message, closes the readline interface, and exits the process with a status code of 0 (indicating successful termination).
+process.on("SIGINT", () => {
+  console.log(chalk.yellow("\n\n👋 Thanks for using AI CLI Assistant!"));
+  rl.close();
+  process.exit(0);
+});
 
 function ask(question) {
   return new Promise((resolve) => {
@@ -10,30 +22,38 @@ function ask(question) {
   });
 }
 
-console.log("AI CLI Assistant");
-console.log("Type 'exit' to quit.\n");
-
-while (true) {
-  const prompt = await ask("You: ");
-
-  if (prompt.trim().toLowerCase() === "exit") {
-    console.log("\nGoodbye! 👋");
-    break;
-  }
-
+async function main() {
   try {
-    const stream = await llm.stream(prompt);
-    process.stdout.write("\nAI: ");
+    while (true) {
+      const prompt = await ask(chalk.green.bold("👤 You > "));
 
-    for await (const chunk of stream) {
-      process.stdout.write(chunk.content);
+      if (prompt.trim().toLowerCase() === "exit") {
+        console.log(chalk.yellow("\n👋 Thanks for using AI CLI Assistant!"));
+        break;
+      }
+
+      try {
+        const stream = await llm.stream(prompt);
+        process.stdout.write(chalk.blue.bold("\nAI: "));
+
+        for await (const chunk of stream) {
+          process.stdout.write(chunk.content);
+        }
+
+        console.log("\n");
+      } catch (error) {
+        console.error(chalk.red.bold("\nError:"), chalk.red(error.message));
+      }
     }
-
-    console.log("\n");
-  } catch (error) {
-    console.error("\nError:", error.message);
+  } finally {
+    // Always executed, even if an error occurs
+    // method closes the Interface instance
+    rl.close();
   }
 }
 
-// method closes the Interface instance
-rl.close();
+// Start the application
+main().catch((err) => {
+  console.error(chalk.red.bold("Fatal Error:"), err);
+  process.exit(1);
+});
