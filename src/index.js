@@ -2,6 +2,8 @@ import rl from "./cli.js";
 import llm from "./llm.js";
 import { showBanner } from "./banner.js";
 import chalk from "chalk";
+import ora from "ora";
+import { AIMessage, HumanMessage } from "@langchain/core/messages"; // conversation history
 
 showBanner();
 
@@ -24,21 +26,39 @@ function ask(question) {
 
 async function main() {
   try {
+    const conversationHistory = []; // to store the conversation history
     while (true) {
       const prompt = await ask(chalk.green.bold("👤 You > "));
+      conversationHistory.push(new HumanMessage({ content: prompt })); // add user prompt to conversation history
 
       if (prompt.trim().toLowerCase() === "exit") {
         console.log(chalk.yellow("\n👋 Thanks for using AI CLI Assistant!"));
         break;
       }
 
-      try {
-        const stream = await llm.stream(prompt);
-        process.stdout.write(chalk.blue.bold("\nAI: "));
+      // using spinner to indicate that the AI is processing the user's input
+      const spinner = ora({
+        text: chalk.blue.bold("AI is thinking..."),
+        color: "magenta",
+      }).start();
 
+      try {
+        // pass conversation history to llm instead of prompt to maintain context in the conversation
+        const stream = await llm.stream(conversationHistory);
+
+        // stop the spinner when the AI starts responding
+        spinner.succeed("Response generated");
+        process.stdout.write(chalk.blue.bold("\n🤖 Assistant >  "));
+
+        // store all chunks to manage chat history
+        let fullResponse = "";
         for await (const chunk of stream) {
+          fullResponse += chunk.content;
           process.stdout.write(chunk.content);
         }
+
+        // add AI response to conversation history
+        conversationHistory.push(new AIMessage({ content: fullResponse }));
 
         console.log("\n");
       } catch (error) {
